@@ -333,6 +333,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         apply(pattern: #"(?m)^(---|\*\*\*|___)\s*$"#, attributes: [.foregroundColor: NSColor.tertiaryLabelColor], to: storage, source: source)
 
         rebuildLivePreviewStyling(in: storage, source: source)
+        styleTableBlocks(in: storage, source: source)
 
         storage.endEditing()
         isHighlighting = false
@@ -341,6 +342,34 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     }
 
     // MARK: - 实时预览（Live Preview）
+
+    /// 表格块的轻量渲染：等宽字体让各列天然对齐，竖线与分隔行弱化显示。
+    /// TextKit 2 不支持 NSTextTable，这是保持性能与可编辑性的折中；完整表格渲染属 P1。
+    private func styleTableBlocks(in storage: NSTextStorage, source: String) {
+        guard forcedLivePreview ?? AppPreferences.livePreviewEnabled else { return }
+        let text = source as NSString
+        let monoFont = NSFont.monospacedSystemFont(ofSize: max(11, AppPreferences.editorFontSize - 2), weight: .regular)
+        let rowStyle = NSMutableParagraphStyle()
+        rowStyle.lineSpacing = 2
+        rowStyle.paragraphSpacing = 0
+
+        apply(pattern: #"(?m)^\s*\|.*\|\s*$"#, attributes: [:], to: storage, source: source) { range in
+            storage.addAttributes([.font: monoFont, .paragraphStyle: rowStyle], range: range)
+            let line = text.substring(with: range) as NSString
+            let isSeparatorRow = line.range(of: #"^\s*\|[\s\-:|]+\|\s*$"#, options: .regularExpression).location != NSNotFound
+            if isSeparatorRow {
+                storage.addAttribute(.foregroundColor, value: NSColor.tertiaryLabelColor, range: range)
+                return
+            }
+            for offset in 0..<line.length where line.character(at: offset) == 0x7C { // "|"
+                storage.addAttribute(
+                    .foregroundColor,
+                    value: NSColor.tertiaryLabelColor,
+                    range: NSRange(location: range.location + offset, length: 1)
+                )
+            }
+        }
+    }
 
     /// 在同一份源文本上叠加内容样式，并登记可折叠的语法标记。
     private func rebuildLivePreviewStyling(in storage: NSTextStorage, source: String) {
@@ -462,13 +491,17 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         pattern: String,
         attributes: [NSAttributedString.Key: Any],
         to storage: NSTextStorage,
-        source: String
+        source: String,
+        perMatch: ((NSRange) -> Void)? = nil
     ) {
         guard let expression = try? NSRegularExpression(pattern: pattern) else { return }
         let range = NSRange(location: 0, length: (source as NSString).length)
         expression.enumerateMatches(in: source, range: range) { match, _, _ in
             guard let match else { return }
-            storage.addAttributes(attributes, range: match.range)
+            if !attributes.isEmpty {
+                storage.addAttributes(attributes, range: match.range)
+            }
+            perMatch?(match.range)
         }
     }
 }
