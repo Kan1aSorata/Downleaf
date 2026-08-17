@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Downleaf Outline Focus QA</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; background: #101010; color: #e8e8e8; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+      body { padding: 24px; }
+      main { display: flex; justify-content: center; gap: 34px; }
+      figure { width: 560px; margin: 0; }
+      figcaption { height: 40px; display: flex; align-items: center; gap: 8px; color: #aaa; font-size: 13px; }
+      .tag { padding: 3px 7px; border: 1px solid #3a3a3a; border-radius: 4px; color: #ddd; background: #1d1d1d; }
+      .crop { position: relative; width: 560px; height: 1082px; overflow: hidden; border: 1px solid #303030; background: #050505; }
+      img { position: absolute; top: -130px; right: -130px; width: 2182px; height: 1342px; max-width: none; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <figure>
+        <figcaption><span class="tag">REFERENCE</span> 右侧大纲区域</figcaption>
+        <div class="crop"><img src="./reference.png" alt="参考图大纲" /></div>
+      </figure>
+      <figure>
+        <figcaption><span class="tag">IMPLEMENTATION V3</span> 可调宽大纲区域</figcaption>
+        <div class="crop"><img src="./implementation-v3.png" alt="原型大纲" /></div>
+      </figure>
+    </main>
+  </body>
+</html>

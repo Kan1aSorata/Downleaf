@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Downleaf Visual QA</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; background: #101010; color: #e8e8e8; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+      body { padding: 22px; }
+      .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+      figure { margin: 0; min-width: 0; }
+      figcaption { height: 34px; display: flex; align-items: center; gap: 8px; color: #a0a0a0; font-size: 13px; }
+      .tag { padding: 3px 7px; border: 1px solid #3a3a3a; border-radius: 4px; color: #dcdcdc; background: #1d1d1d; }
+      img { display: block; width: 100%; height: auto; border: 1px solid #303030; background: #050505; }
+    </style>
+  </head>
+  <body>
+    <main class="comparison">
+      <figure>
+        <figcaption><span class="tag">REFERENCE</span> 用户提供的视觉基准 · 2182 × 1342</figcaption>
+        <img src="./reference.png" alt="参考图" />
+      </figure>
+      <figure>
+        <figcaption><span class="tag">IMPLEMENTATION V3</span> Downleaf 原型 · 2182 × 1342</figcaption>
+        <img src="./implementation-v3.png" alt="最终原型" />
+      </figure>
+    </main>
+  </body>
+</html>

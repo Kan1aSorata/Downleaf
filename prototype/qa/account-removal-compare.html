@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Downleaf V5 · 去除账号系统对照</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-width: 1180px;
+        color: #e6e6e6;
+        background: #0a0a0a;
+        font: 13px/1.45 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      }
+      main { padding: 22px 26px 28px; }
+      header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      h1 { margin: 0; font-size: 19px; font-weight: 650; }
+      header p { margin: 0; color: #8b8b8b; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+      figure {
+        margin: 0;
+        overflow: hidden;
+        border: 1px solid #303030;
+        border-radius: 8px;
+        background: #111;
+      }
+      figcaption {
+        padding: 9px 12px;
+        border-bottom: 1px solid #2c2c2c;
+        color: #b8b8b8;
+      }
+      .full img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .focus-row {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .focus-frame {
+        position: relative;
+        height: 230px;
+        overflow: hidden;
+        background: #050505;
+      }
+      .focus-frame img {
+        position: absolute;
+        left: -78px;
+        top: -474px;
+        width: 1280px;
+        height: 720px;
+        max-width: none;
+      }
+      .note {
+        margin-top: 14px;
+        padding: 10px 12px;
+        border-left: 2px solid #45dc8c;
+        color: #aaa;
+        background: #141414;
+      }
+      strong { color: #f0f0f0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>V5 · 暂不提供账号系统</h1>
+        <p>同一视口：1280 × 720 CSS px · DPR 1</p>
+      </header>
+
+      <section class="grid" aria-label="完整界面对照">
+        <figure class="full">
+          <figcaption>改版前：侧栏底部存在“本地文件夹 / 离线”身份式状态，标题栏使用云端语义图标</figcaption>
+          <img src="implementation-v4-1280.png" alt="改版前完整界面" />
+        </figure>
+        <figure class="full">
+          <figcaption>改版后：不再保留账户式状态区域，保存反馈改为普通本地勾选</figcaption>
+          <img src="implementation-v5-no-account.jpg" alt="改版后完整界面" />
+        </figure>
+      </section>
+
+      <section class="focus-row" aria-label="左下角重点对照">
+        <figure>
+          <figcaption>重点区域 · 改版前</figcaption>
+          <div class="focus-frame"><img src="implementation-v4-1280.png" alt="改版前侧栏底部" /></div>
+        </figure>
+        <figure>
+          <figcaption>重点区域 · 改版后</figcaption>
+          <div class="focus-frame"><img src="implementation-v5-no-account.jpg" alt="改版后侧栏底部" /></div>
+        </figure>
+      </section>
+
+      <div class="note"><strong>产品边界：</strong>P0/P1 不实现账号、登录、个人资料、会员订阅或云同步，也不为这些能力预留头像、菜单和状态占位。</div>
+    </main>
+  </body>
+</html>

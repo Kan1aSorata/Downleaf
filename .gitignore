@@ -1,0 +1,67 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode
+DerivedData/
+build/
+.xcode-derived*/
+SourcePackages/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+*.moved-aside
+*.dSYM
+*.dSYM.zip
+*.xcarchive
+*.xcresult
+*.ipa
+*.pkg
+*.app
+
+# Swift Package Manager
+.build/
+.swiftpm/
+*.profdata
+*.profraw
+
+# Prototype dependencies and generated output
+prototype/node_modules/
+prototype/dist/
+prototype/.vite/
+prototype/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Generated design artifacts
+Design/Icons/Exports/DocumentIconCompiled/
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# Python tooling
+__pycache__/
+*.py[cod]
+.venv/
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local logs and temporary files
+*.log
+*.tmp
+*.bak
+*.orig

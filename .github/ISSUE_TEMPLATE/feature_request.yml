@@ -1,0 +1,29 @@
+name: 功能建议
+description: 提议符合 Downleaf 产品方向的改进
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      description: 请先描述使用场景和痛点，而不是只描述按钮或实现方式。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 说明理想交互，以及它如何保持应用极简、原生和文件优先。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 考虑过的替代方案
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: 产品范围确认
+      options:
+        - label: 这项建议直接服务于 Markdown 编辑、阅读或文档导航。
+          required: true

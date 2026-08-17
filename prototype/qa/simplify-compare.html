@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Downleaf 左侧导航减法对比</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+        background: #090909;
+        color: #ededed;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        width: 100vw;
+        min-height: 100vh;
+        margin: 0;
+        padding: 26px;
+        background: #090909;
+      }
+
+      header {
+        margin-bottom: 18px;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 20px;
+        letter-spacing: -0.02em;
+      }
+
+      header p {
+        margin: 0;
+        color: #8c8c8c;
+        font-size: 12px;
+      }
+
+      .comparison {
+        display: grid;
+        grid-template-columns: 148px minmax(0, 1fr) minmax(0, 1fr);
+        gap: 14px;
+      }
+
+      figure {
+        min-width: 0;
+        margin: 0;
+        padding: 10px;
+        border: 1px solid #2e2e2e;
+        border-radius: 9px;
+        background: #121212;
+      }
+
+      figcaption {
+        height: 28px;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        color: #a7a7a7;
+        font-size: 11px;
+      }
+
+      figcaption strong {
+        color: #e3e3e3;
+        font-size: 12px;
+      }
+
+      .reference-frame,
+      .full-frame {
+        height: 500px;
+        overflow: hidden;
+        border: 1px solid #272727;
+        border-radius: 5px;
+        background: #050505;
+      }
+
+      .reference-frame {
+        display: grid;
+        place-items: center;
+      }
+
+      .reference-frame img {
+        height: 488px;
+        width: auto;
+      }
+
+      .full-frame img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+
+      .result {
+        margin-top: 14px;
+        padding: 12px 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid rgba(69, 220, 140, 0.22);
+        border-radius: 8px;
+        color: #a7b7ad;
+        background: rgba(69, 220, 140, 0.055);
+        font-size: 12px;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        flex: 0 0 auto;
+        border-radius: 50%;
+        background: #45dc8c;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>左侧功能减法</h1>
+      <p>保留文稿、正文和大纲；移除常驻功能轨与重复分类，把低频命令收进单一菜单。</p>
+    </header>
+
+    <main class="comparison">
+      <figure>
+        <figcaption><strong>用户标注</strong><span>移除</span></figcaption>
+        <div class="reference-frame">
+          <img src="./remove-left-rail-reference.png" alt="需要移除的左侧功能轨" />
+        </div>
+      </figure>
+
+      <figure>
+        <figcaption><strong>修改前</strong><span>常驻双层侧栏</span></figcaption>
+        <div class="full-frame">
+          <img src="./implementation-v3.png" alt="修改前的 Downleaf 原型" />
+        </div>
+      </figure>
+
+      <figure>
+        <figcaption><strong>修改后</strong><span>文稿栏直达左边界</span></figcaption>
+        <div class="full-frame">
+          <img src="./implementation-v4-1280.png" alt="移除功能轨后的 Downleaf 原型" />
+        </div>
+      </figure>
+    </main>
+
+    <div class="result"><span class="dot"></span>窗口内减少一整列常驻控件，正文获得更多横向空间；新建仍保留在文稿栏，其他命令通过右上角菜单和快捷键访问。</div>
+  </body>
+</html>

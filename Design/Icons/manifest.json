@@ -1,0 +1,31 @@
+{
+  "name": "Downleaf macOS Icon Set",
+  "version": 1,
+  "selectedDirection": "nested-headings",
+  "source": "Candidates/nested-headings.png",
+  "masterExport": {
+    "path": "Exports/Downleaf-AppIcon-1024.png",
+    "width": 1024,
+    "height": 1024,
+    "format": "png"
+  },
+  "documentIcon": {
+    "master": "Exports/Downleaf-DocumentIcon-1024.png",
+    "compiled": "../../Downleaf/MarkdownDocument.icns",
+    "assetSource": "DocumentIcon.xcassets/MarkdownDocument.appiconset"
+  },
+  "templateMark": "../../Downleaf/Assets.xcassets/DownleafTemplate.imageset",
+  "xcodeAsset": "../../Downleaf/Assets.xcassets/AppIcon.appiconset",
+  "slots": [
+    { "size": "16x16", "scale": "1x", "filename": "icon_16x16.png" },
+    { "size": "16x16", "scale": "2x", "filename": "icon_16x16@2x.png" },
+    { "size": "32x32", "scale": "1x", "filename": "icon_32x32.png" },
+    { "size": "32x32", "scale": "2x", "filename": "icon_32x32@2x.png" },
+    { "size": "128x128", "scale": "1x", "filename": "icon_128x128.png" },
+    { "size": "128x128", "scale": "2x", "filename": "icon_128x128@2x.png" },
+    { "size": "256x256", "scale": "1x", "filename": "icon_256x256.png" },
+    { "size": "256x256", "scale": "2x", "filename": "icon_256x256@2x.png" },
+    { "size": "512x512", "scale": "1x", "filename": "icon_512x512.png" },
+    { "size": "512x512", "scale": "2x", "filename": "icon_512x512@2x.png" }
+  ]
+}

@@ -1,0 +1,50 @@
+name: Bug 报告
+description: 报告可复现的错误或异常行为
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: 感谢你帮助改进 Downleaf。提交前请先搜索已有 Issue。
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 实际发生了什么？你原本期待什么？
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开……
+        2. 点击……
+        3. 看到……
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Downleaf 版本或提交
+      placeholder: 0.1.0 或 commit SHA
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: macOS 与设备
+      placeholder: macOS 26.0，Apple silicon
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 补充信息
+      description: 可附日志、截图或不包含隐私信息的 Markdown 样例。
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: 提交确认
+      options:
+        - label: 我已搜索现有 Issue，且样例内容不包含敏感信息。
+          required: true

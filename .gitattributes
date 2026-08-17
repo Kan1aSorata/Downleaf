@@ -1,0 +1,17 @@
+* text=auto
+
+*.swift text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.plist text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.jsx text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.icns binary
