@@ -147,6 +147,7 @@ final class DocumentRootSplitViewController: NSSplitViewController {
     func replaceEditorTextAfterRevert(_ text: String) {
         currentSource = text
         contentViewController.editorViewController.replaceTextAfterRevert(text)
+        contentViewController.mirrorEditedSource(text, from: contentViewController.editorViewController)
         scheduleSemanticUpdate(for: text, immediate: true)
     }
 
@@ -191,14 +192,19 @@ final class DocumentRootSplitViewController: NSSplitViewController {
 
     private func wireInteractions() {
         contentViewController.editorViewController.onTextChange = { [weak self] text in
-            guard let self else { return }
-            self.currentSource = text
-            self.document.userDidEdit(text: text)
-            self.onDocumentStateChange?()
-            self.scheduleSemanticUpdate(for: text)
+            self?.handleUserEdit(text, from: self?.contentViewController.editorViewController)
+        }
+
+        contentViewController.previewEditorViewController.onTextChange = { [weak self] text in
+            self?.handleUserEdit(text, from: self?.contentViewController.previewEditorViewController)
         }
 
         contentViewController.editorViewController.onCaretOffsetChange = { [weak self] offset in
+            self?.updateActiveAnchorForEditorOffset(offset)
+        }
+
+        contentViewController.previewEditorViewController.onCaretOffsetChange = { [weak self] offset in
+            guard self?.contentViewController.mode == .split else { return }
             self?.updateActiveAnchorForEditorOffset(offset)
         }
 
@@ -221,6 +227,16 @@ final class DocumentRootSplitViewController: NSSplitViewController {
             }
             self.contentViewController.scrollPreview(to: heading.anchor)
         }
+    }
+
+    private func handleUserEdit(_ text: String, from editor: EditorViewController?) {
+        currentSource = text
+        document.userDidEdit(text: text)
+        if let editor {
+            contentViewController.mirrorEditedSource(text, from: editor)
+        }
+        onDocumentStateChange?()
+        scheduleSemanticUpdate(for: text)
     }
 
     private func scheduleSemanticUpdate(for source: String, immediate: Bool = false) {

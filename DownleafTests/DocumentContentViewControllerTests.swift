@@ -42,7 +42,7 @@ final class DocumentContentViewControllerTests: XCTestCase {
             XCTAssertEqual(controller.mode, mode)
         }
 
-        XCTAssertEqual(controller.children.count, 2)
+        XCTAssertEqual(controller.children.count, 3)
         assertSurfaces(controller, mode: .editor, editorVisible: true, previewVisible: false)
     }
 
@@ -81,7 +81,7 @@ final class DocumentContentViewControllerTests: XCTestCase {
             preserving: "heading-0"
         )
 
-        controller.setMode(.split)
+        controller.setMode(.reader)
         controller.view.frame = NSRect(x: 0, y: 0, width: 1_000, height: 700)
         controller.synchronizeLayoutAfterContainerResize()
 
@@ -92,7 +92,7 @@ final class DocumentContentViewControllerTests: XCTestCase {
         XCTAssertGreaterThan(webView.frame.height, 1)
     }
 
-    func testSplitPreviewLoadsTheCurrentMarkdown() async throws {
+    func testReaderPreviewLoadsTheCurrentMarkdown() async throws {
         let controller = DocumentContentViewController()
         controller.loadViewIfNeeded()
         let source = "# 可见的预览标题\n\n可见的预览正文"
@@ -103,7 +103,7 @@ final class DocumentContentViewControllerTests: XCTestCase {
             preserving: "heading-0"
         )
 
-        controller.setMode(.split)
+        controller.setMode(.reader)
         controller.view.frame = NSRect(x: 0, y: 0, width: 1_000, height: 700)
         controller.synchronizeLayoutAfterContainerResize()
 
@@ -146,11 +146,61 @@ final class DocumentContentViewControllerTests: XCTestCase {
         XCTAssertEqual(decoded, unsafeLookingAnchor)
     }
 
+    func testSplitShowsEditableLivePreviewWithCurrentText() {
+        let controller = makeController()
+        controller.setMode(.split)
+        controller.view.layoutSubtreeIfNeeded()
+
+        let previewTextView = controller.previewEditorViewController.textView
+        XCTAssertTrue(previewTextView.isDescendant(of: controller.view))
+        XCTAssertTrue(previewTextView.isEditable)
+        XCTAssertEqual(previewTextView.string, controller.editorViewController.textView.string)
+    }
+
+    func testEditingRightPaneMirrorsToLeftPaneAndReportsChange() {
+        let controller = makeController()
+        controller.setMode(.split)
+        controller.view.layoutSubtreeIfNeeded()
+
+        var reportedText: String?
+        controller.previewEditorViewController.onTextChange = { [weak controller] text in
+            reportedText = text
+            if let controller {
+                controller.mirrorEditedSource(text, from: controller.previewEditorViewController)
+            }
+        }
+
+        let previewTextView = controller.previewEditorViewController.textView
+        previewTextView.setSelectedRange(NSRange(location: 0, length: 0))
+        previewTextView.insertText("新增", replacementRange: NSRange(location: 0, length: 0))
+
+        XCTAssertEqual(reportedText, previewTextView.string)
+        XCTAssertEqual(controller.editorViewController.textView.string, previewTextView.string)
+    }
+
+    func testEditingLeftPaneMirrorsToRightPane() {
+        let controller = makeController()
+        controller.setMode(.split)
+        controller.view.layoutSubtreeIfNeeded()
+
+        let editorTextView = controller.editorViewController.textView
+        controller.editorViewController.onTextChange = { [weak controller] text in
+            if let controller {
+                controller.mirrorEditedSource(text, from: controller.editorViewController)
+            }
+        }
+        editorTextView.setSelectedRange(NSRange(location: 0, length: 0))
+        editorTextView.insertText("左侧", replacementRange: NSRange(location: 0, length: 0))
+
+        XCTAssertEqual(controller.previewEditorViewController.textView.string, editorTextView.string)
+    }
+
     private func makeController() -> DocumentContentViewController {
         let controller = DocumentContentViewController()
         controller.loadViewIfNeeded()
         controller.view.frame = NSRect(x: 0, y: 0, width: 1_000, height: 700)
         let source = "# 第一章\n\n正文\n\n## 第二章\n\n更多正文"
+        controller.editorViewController.setInitialText(source)
         controller.update(
             source: source,
             headings: MarkdownOutlineParser.headings(in: source),

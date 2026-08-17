@@ -40,8 +40,11 @@ enum DocumentMode: Int, CaseIterable {
 @MainActor
 final class DocumentContentViewController: NSViewController, NSSplitViewDelegate {
     let editorViewController = EditorViewController()
+    /// 分屏模式右侧的可编辑实时预览：与左侧共享同一份文本，双向镜像。
+    let previewEditorViewController = EditorViewController()
     private let previewHostView = NSView()
     private var previewViewController: PreviewViewController?
+    private var isPreviewEditorInstalled = false
     private var contentSplitView: PreviewSplitView?
     private(set) var mode: DocumentMode = .editor
     private var source = ""
@@ -62,9 +65,21 @@ final class DocumentContentViewController: NSViewController, NSSplitViewDelegate
     }
 
     var isPreviewSurfaceVisible: Bool {
-        guard isViewLoaded, let previewViewController else { return false }
-        return previewViewController.view.isDescendant(of: view)
-            && previewHostView.frame.width > 1
+        guard isViewLoaded else { return false }
+        switch mode {
+        case .editor:
+            return false
+        case .split:
+            return isPreviewEditorInstalled
+                && previewEditorViewController.view.isDescendant(of: view)
+                && !previewEditorViewController.view.isHidden
+                && previewHostView.frame.width > 1
+        case .reader:
+            guard let previewViewController else { return false }
+            return previewViewController.view.isDescendant(of: view)
+                && !previewViewController.view.isHidden
+                && previewHostView.frame.width > 1
+        }
     }
 
     override func loadView() {
@@ -105,8 +120,23 @@ final class DocumentContentViewController: NSViewController, NSSplitViewDelegate
         self.headings = headings
         self.baseURL = baseURL
         activeAnchor = anchor
-        guard mode != .editor else { return }
-        ensurePreview().setMarkdown(source, headings: headings, baseURL: baseURL, preserving: anchor)
+        switch mode {
+        case .editor:
+            break
+        case .split:
+            if isPreviewEditorInstalled {
+                previewEditorViewController.applyMirroredText(source)
+            }
+        case .reader:
+            ensurePreview().setMarkdown(source, headings: headings, baseURL: baseURL, preserving: anchor)
+        }
+    }
+
+    /// 一侧编辑器产生用户编辑后，把文本镜像到另一侧（仅分屏模式需要）。
+    func mirrorEditedSource(_ text: String, from editor: EditorViewController) {
+        guard mode == .split, isPreviewEditorInstalled else { return }
+        let counterpart = editor === editorViewController ? previewEditorViewController : editorViewController
+        counterpart.applyMirroredText(text)
     }
 
     func preserveActiveAnchor(_ anchor: String?) {
@@ -115,8 +145,16 @@ final class DocumentContentViewController: NSViewController, NSSplitViewDelegate
 
     func scrollPreview(to anchor: String) {
         activeAnchor = anchor
-        guard mode != .editor else { return }
-        ensurePreview().scroll(to: anchor)
+        switch mode {
+        case .editor:
+            break
+        case .split:
+            if let heading = headings.first(where: { $0.anchor == anchor }) {
+                previewEditorViewController.reveal(heading.sourceRange)
+            }
+        case .reader:
+            ensurePreview().scroll(to: anchor)
+        }
     }
 
     func focusPrimaryContent() {
@@ -194,18 +232,37 @@ final class DocumentContentViewController: NSViewController, NSSplitViewDelegate
         contentSplitView = splitView
     }
 
+    private func ensurePreviewEditorInstalled() {
+        guard !isPreviewEditorInstalled else { return }
+        previewEditorViewController.forcedLivePreview = true
+        addChild(previewEditorViewController)
+        previewEditorViewController.view.frame = previewHostView.bounds
+        previewEditorViewController.view.autoresizingMask = [.width, .height]
+        previewHostView.addSubview(previewEditorViewController.view)
+        previewEditorViewController.setInitialText(source)
+        isPreviewEditorInstalled = true
+    }
+
     private func applyModeVisibility() {
         switch mode {
         case .editor:
-            break
+            editorViewController.forcedLivePreview = nil
         case .reader:
+            editorViewController.forcedLivePreview = nil
             let preview = ensurePreview()
             preview.prepareIfNeeded()
+            preview.setMarkdown(source, headings: headings, baseURL: baseURL, preserving: activeAnchor)
         case .split:
-            let preview = ensurePreview()
-            preview.prepareIfNeeded()
+            // 左侧固定为源码样式，右侧是可编辑的实时预览。
+            editorViewController.forcedLivePreview = false
+            ensurePreviewEditorInstalled()
+            previewEditorViewController.applyMirroredText(source)
         }
 
+        previewViewController?.view.isHidden = mode != .reader
+        if isPreviewEditorInstalled {
+            previewEditorViewController.view.isHidden = mode != .split
+        }
         editorViewController.view.isHidden = false
         previewHostView.isHidden = false
         applyModeGeometry()
@@ -237,6 +294,9 @@ final class DocumentContentViewController: NSViewController, NSSplitViewDelegate
         previewViewController?.view.frame = previewHostView.bounds
         previewViewController?.view.needsLayout = true
         previewViewController?.view.needsDisplay = true
+        if isPreviewEditorInstalled {
+            previewEditorViewController.view.frame = previewHostView.bounds
+        }
     }
 
     private func applyStoredSplitPosition() {

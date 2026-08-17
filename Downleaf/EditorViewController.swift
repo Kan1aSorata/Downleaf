@@ -118,6 +118,14 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     var onTextChange: ((String) -> Void)?
     var onCaretOffsetChange: ((Int) -> Void)?
 
+    /// 覆盖全局实时预览偏好：分屏模式下左侧强制源码（false）、右侧强制实时预览（true）。
+    var forcedLivePreview: Bool? {
+        didSet {
+            guard oldValue != forcedLivePreview, isViewLoaded else { return }
+            applySyntaxHighlighting()
+        }
+    }
+
     private struct MarkerState {
         let elementIndex: Int
         let range: NSRange
@@ -226,6 +234,35 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         applySyntaxHighlighting()
     }
 
+    /// 从另一侧编辑器镜像文本：只替换首尾公共部分之间的最小差异范围，
+    /// 保住本侧的滚动位置与选区，避免整篇重设。
+    func applyMirroredText(_ text: String) {
+        guard isViewLoaded, let storage = textView.textStorage else { return }
+        let old = storage.string as NSString
+        let new = text as NSString
+        guard !old.isEqual(to: text) else { return }
+
+        var prefix = 0
+        let minLength = min(old.length, new.length)
+        while prefix < minLength, old.character(at: prefix) == new.character(at: prefix) {
+            prefix += 1
+        }
+        var suffix = 0
+        while suffix < minLength - prefix,
+              old.character(at: old.length - 1 - suffix) == new.character(at: new.length - 1 - suffix) {
+            suffix += 1
+        }
+
+        isApplyingProgrammaticText = true
+        concealmentIsStale = true
+        storage.replaceCharacters(
+            in: NSRange(location: prefix, length: old.length - prefix - suffix),
+            with: new.substring(with: NSRange(location: prefix, length: new.length - prefix - suffix))
+        )
+        isApplyingProgrammaticText = false
+        scheduleHighlighting()
+    }
+
     func focusEditor() {
         view.window?.makeFirstResponder(textView)
     }
@@ -237,6 +274,13 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         textView.scrollRangeToVisible(NSRange(location: location, length: min(1, max(0, length - location))))
         focusEditor()
         onCaretOffsetChange?(location)
+    }
+
+    /// 滚动到指定源码范围但不抢焦点，用于分屏模式的两侧同步。
+    func reveal(_ range: NSRange) {
+        let length = (textView.string as NSString).length
+        let location = min(max(0, range.location), length)
+        textView.scrollRangeToVisible(NSRange(location: location, length: min(1, max(0, length - location))))
     }
 
     func textDidChange(_ notification: Notification) {
@@ -303,7 +347,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         concealableElements = []
         markerStates = []
         revealedElementIndices = []
-        guard AppPreferences.livePreviewEnabled else { return }
+        guard forcedLivePreview ?? AppPreferences.livePreviewEnabled else { return }
 
         concealableElements = LivePreviewParser.elements(in: source)
         for (index, element) in concealableElements.enumerated() {
