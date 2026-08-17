@@ -1,8 +1,23 @@
+import AppKit
 import XCTest
 @testable import Downleaf
 
 @MainActor
 final class DocumentRootSplitViewControllerTests: XCTestCase {
+    func testWindowContentFillsAFullscreenSizedResize() throws {
+        let document = MarkdownDocument()
+        let controller = DocumentWindowController(document: document)
+        let window = try XCTUnwrap(controller.window)
+        defer { window.close() }
+
+        let fullscreenContentSize = NSSize(width: 1_800, height: 1_000)
+        window.setContentSize(fullscreenContentSize)
+        window.layoutIfNeeded()
+
+        XCTAssertEqual(window.contentView?.bounds.size, fullscreenContentSize)
+        XCTAssertEqual(window.contentViewController?.view.frame.size, fullscreenContentSize)
+    }
+
     func testOutlineExpansionKeepsRightEdgeFixedAndMovesDividerLeft() {
         let splitWidth: CGFloat = 1_180
         let dividerThickness: CGFloat = 1

@@ -20,7 +20,6 @@ final class DocumentWindowController: NSWindowController, NSToolbarDelegate, NSW
         markdownDocument = document
         rootSplitViewController = DocumentRootSplitViewController(document: document)
 
-        rootSplitViewController.preferredContentSize = Self.defaultContentSize
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: Self.defaultContentSize),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
