@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 import XCTest
 @testable import Downleaf
 
@@ -69,6 +70,65 @@ final class DocumentContentViewControllerTests: XCTestCase {
         assertSurfaces(controller, mode: .split, editorVisible: true, previewVisible: true)
     }
 
+    func testPreviewCreatedAtZeroSizeFillsItsHostAfterWindowLayout() throws {
+        let controller = DocumentContentViewController()
+        controller.loadViewIfNeeded()
+        let source = "# 预览标题\n\n预览正文"
+        controller.update(
+            source: source,
+            headings: MarkdownOutlineParser.headings(in: source),
+            baseURL: nil,
+            preserving: "heading-0"
+        )
+
+        controller.setMode(.split)
+        controller.view.frame = NSRect(x: 0, y: 0, width: 1_000, height: 700)
+        controller.synchronizeLayoutAfterContainerResize()
+
+        let webView = try XCTUnwrap(firstDescendant(of: controller.view, as: WKWebView.self))
+        let hostView = try XCTUnwrap(webView.superview)
+        XCTAssertEqual(webView.frame, hostView.bounds)
+        XCTAssertGreaterThan(webView.frame.width, 1)
+        XCTAssertGreaterThan(webView.frame.height, 1)
+    }
+
+    func testSplitPreviewLoadsTheCurrentMarkdown() async throws {
+        let controller = DocumentContentViewController()
+        controller.loadViewIfNeeded()
+        let source = "# 可见的预览标题\n\n可见的预览正文"
+        controller.update(
+            source: source,
+            headings: MarkdownOutlineParser.headings(in: source),
+            baseURL: nil,
+            preserving: "heading-0"
+        )
+
+        controller.setMode(.split)
+        controller.view.frame = NSRect(x: 0, y: 0, width: 1_000, height: 700)
+        controller.synchronizeLayoutAfterContainerResize()
+
+        let webView = try XCTUnwrap(firstDescendant(of: controller.view, as: WKWebView.self))
+        var renderedText = ""
+        var lastError: Error?
+        for _ in 0..<40 {
+            do {
+                if let text = try await webView.evaluateJavaScript("document.body.innerText") as? String {
+                    renderedText = text
+                    if text.contains("可见的预览标题") {
+                        break
+                    }
+                }
+            } catch {
+                lastError = error
+            }
+            try await Task.sleep(for: .milliseconds(50))
+        }
+
+        let diagnostic = "text=\(renderedText), url=\(String(describing: webView.url)), loading=\(webView.isLoading), error=\(String(describing: lastError))"
+        XCTAssertTrue(renderedText.contains("可见的预览标题"), diagnostic)
+        XCTAssertTrue(renderedText.contains("可见的预览正文"), diagnostic)
+    }
+
     func testPreviewAnchorIsEncodedAsSafeJavaScriptStringLiteral() throws {
         XCTAssertEqual(
             PreviewViewController.javaScriptStringLiteral(for: "heading-0"),
@@ -126,5 +186,17 @@ final class DocumentContentViewControllerTests: XCTestCase {
             line: line
         )
         XCTAssertEqual(controller.view.subviews.count, 1, file: file, line: line)
+    }
+
+    private func firstDescendant<T: NSView>(of view: NSView, as type: T.Type) -> T? {
+        for subview in view.subviews {
+            if let match = subview as? T {
+                return match
+            }
+            if let match = firstDescendant(of: subview, as: type) {
+                return match
+            }
+        }
+        return nil
     }
 }
