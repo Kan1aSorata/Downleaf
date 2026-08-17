@@ -118,6 +118,18 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     var onTextChange: ((String) -> Void)?
     var onCaretOffsetChange: ((Int) -> Void)?
 
+    private struct MarkerState {
+        let elementIndex: Int
+        let range: NSRange
+        let visibleFont: NSFont
+    }
+
+    private var concealableElements: [LivePreviewElement] = []
+    private var markerStates: [MarkerState] = []
+    private var revealedElementIndices: Set<Int> = []
+    private var concealmentIsStale = false
+    private static let hiddenMarkerFont = NSFont.systemFont(ofSize: 0.1)
+
     var caretOffset: Int {
         min(textView.selectedRange().location, (textView.string as NSString).length)
     }
@@ -229,6 +241,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     func textDidChange(_ notification: Notification) {
         guard !isApplyingProgrammaticText, !isHighlighting else { return }
+        concealmentIsStale = true
         onTextChange?(textView.string)
         onCaretOffsetChange?(textView.selectedRange().location)
         scheduleHighlighting()
@@ -237,6 +250,7 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     func textViewDidChangeSelection(_ notification: Notification) {
         guard !isApplyingProgrammaticText else { return }
         onCaretOffsetChange?(textView.selectedRange().location)
+        updateMarkerConcealment()
     }
 
     private func scheduleHighlighting() {
@@ -253,6 +267,8 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let source = storage.string
         let fullRange = NSRange(location: 0, length: (source as NSString).length)
         guard fullRange.length <= 2_000_000 else {
+            concealableElements = []
+            markerStates = []
             storage.setAttributes(baseAttributes(), range: fullRange)
             return
         }
@@ -272,8 +288,105 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         apply(pattern: #"\[[^\]]+\]\([^\)]+\)"#, attributes: [.foregroundColor: NSColor.linkColor], to: storage, source: source)
         apply(pattern: #"(?m)^(---|\*\*\*|___)\s*$"#, attributes: [.foregroundColor: NSColor.tertiaryLabelColor], to: storage, source: source)
 
+        rebuildLivePreviewStyling(in: storage, source: source)
+
         storage.endEditing()
         isHighlighting = false
+        concealmentIsStale = false
+        updateMarkerConcealment(force: true)
+    }
+
+    // MARK: - 实时预览（Live Preview）
+
+    /// 在同一份源文本上叠加内容样式，并登记可折叠的语法标记。
+    private func rebuildLivePreviewStyling(in storage: NSTextStorage, source: String) {
+        concealableElements = []
+        markerStates = []
+        revealedElementIndices = []
+        guard AppPreferences.livePreviewEnabled else { return }
+
+        concealableElements = LivePreviewParser.elements(in: source)
+        for (index, element) in concealableElements.enumerated() {
+            switch element.kind {
+            case .strong:
+                applyFontTraits(.boldFontMask, in: contentRange(of: element), to: storage)
+            case .emphasis:
+                applyFontTraits(.italicFontMask, in: contentRange(of: element), to: storage)
+            case .strikethrough:
+                storage.addAttribute(
+                    .strikethroughStyle,
+                    value: NSUnderlineStyle.single.rawValue,
+                    range: contentRange(of: element)
+                )
+            case .heading, .inlineCode, .link:
+                break
+            }
+
+            for markerRange in element.markerRanges where markerRange.upperBound <= storage.length {
+                let font = storage.attribute(.font, at: markerRange.location, effectiveRange: nil) as? NSFont
+                markerStates.append(MarkerState(
+                    elementIndex: index,
+                    range: markerRange,
+                    visibleFont: font ?? NSFont.systemFont(ofSize: AppPreferences.editorFontSize)
+                ))
+            }
+        }
+        revealedElementIndices = Set(concealableElements.indices)
+    }
+
+    /// 根据当前光标/选区折叠或恢复语法标记；只触碰状态发生变化的范围。
+    private func updateMarkerConcealment(force: Bool = false) {
+        guard isViewLoaded,
+              !concealmentIsStale,
+              !markerStates.isEmpty,
+              !textView.hasMarkedText(),
+              let storage = textView.textStorage else { return }
+
+        let selection = textView.selectedRange()
+        var revealed: Set<Int> = []
+        for (index, element) in concealableElements.enumerated()
+        where selection.location <= element.range.upperBound
+            && selection.upperBound >= element.range.location {
+            revealed.insert(index)
+        }
+        guard force || revealed != revealedElementIndices else { return }
+
+        isHighlighting = true
+        storage.beginEditing()
+        for state in markerStates where state.range.upperBound <= storage.length {
+            let shouldReveal = revealed.contains(state.elementIndex)
+            guard force || shouldReveal != revealedElementIndices.contains(state.elementIndex) else { continue }
+            if shouldReveal {
+                storage.addAttributes([
+                    .font: state.visibleFont,
+                    .foregroundColor: NSColor.tertiaryLabelColor
+                ], range: state.range)
+            } else {
+                storage.addAttributes([
+                    .font: Self.hiddenMarkerFont,
+                    .foregroundColor: NSColor.clear
+                ], range: state.range)
+            }
+        }
+        storage.endEditing()
+        isHighlighting = false
+        revealedElementIndices = revealed
+    }
+
+    private func contentRange(of element: LivePreviewElement) -> NSRange {
+        guard let first = element.markerRanges.first, let last = element.markerRanges.last,
+              element.markerRanges.count == 2, last.location >= first.upperBound else {
+            return element.range
+        }
+        return NSRange(location: first.upperBound, length: last.location - first.upperBound)
+    }
+
+    private func applyFontTraits(_ traits: NSFontTraitMask, in range: NSRange, to storage: NSTextStorage) {
+        guard range.length > 0, range.upperBound <= storage.length else { return }
+        storage.enumerateAttribute(.font, in: range) { value, subrange, _ in
+            let font = value as? NSFont ?? NSFont.systemFont(ofSize: AppPreferences.editorFontSize)
+            storage.addAttribute(.font, value: NSFontManager.shared.convert(font, toHaveTrait: traits), range: subrange)
+        }
     }
 
     private func baseAttributes() -> [NSAttributedString.Key: Any] {

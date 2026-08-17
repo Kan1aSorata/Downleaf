@@ -2,7 +2,7 @@ import AppKit
 
 @main
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var settingsWindowController: SettingsWindowController?
     private var pendingInitialDocumentWorkItem: DispatchWorkItem?
     private var documentsPendingTermination: [MarkdownDocument] = []
@@ -152,6 +152,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showEditorMode(_ sender: Any?) {
         activeWindowController?.setMode(.editor)
+    }
+
+    @objc func toggleLivePreview(_ sender: Any?) {
+        AppPreferences.livePreviewEnabled.toggle()
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(toggleLivePreview(_:)) {
+            menuItem.state = AppPreferences.livePreviewEnabled ? .on : .off
+        }
+        return true
     }
 
     @objc func toggleOutline(_ sender: Any?) {

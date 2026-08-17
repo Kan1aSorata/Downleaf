@@ -77,6 +77,7 @@ enum MenuBuilder {
         viewMenu.addItem(item("切换编辑 / 阅读", action: #selector(AppDelegate.toggleReadingMode(_:)), key: "e", target: delegate))
         viewMenu.addItem(item("分栏预览", action: #selector(AppDelegate.showSplitMode(_:)), key: "e", modifiers: [.command, .option], target: delegate))
         viewMenu.addItem(item("源码编辑", action: #selector(AppDelegate.showEditorMode(_:)), target: delegate))
+        viewMenu.addItem(item("实时预览", action: #selector(AppDelegate.toggleLivePreview(_:)), key: "e", modifiers: [.command, .shift], target: delegate))
         viewMenu.addItem(.separator())
         viewMenu.addItem(item("显示 / 隐藏大纲", action: #selector(AppDelegate.toggleOutline(_:)), key: "o", modifiers: [.command, .option], target: delegate))
         viewMenu.addItem(item("跳转标题…", action: #selector(AppDelegate.focusOutline(_:)), key: "j", target: delegate))

@@ -8,6 +8,7 @@ enum AppPreferences {
         static let editorFontSize = "EditorFontSize"
         static let showLineNumbers = "ShowLineNumbers"
         static let previewSplitFraction = "PreviewSplitFraction"
+        static let livePreviewEnabled = "LivePreviewEnabled"
     }
 
     static let defaultOutlineWidth: CGFloat = 260
@@ -22,8 +23,14 @@ enum AppPreferences {
             Key.outlineWidth: Double(defaultOutlineWidth),
             Key.editorFontSize: 15.0,
             Key.showLineNumbers: false,
-            Key.previewSplitFraction: 0.5
+            Key.previewSplitFraction: 0.5,
+            Key.livePreviewEnabled: true
         ])
+    }
+
+    static var livePreviewEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: Key.livePreviewEnabled) }
+        set { UserDefaults.standard.set(newValue, forKey: Key.livePreviewEnabled) }
     }
 
     static var autoSaveEnabled: Bool {
