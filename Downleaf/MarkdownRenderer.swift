@@ -38,6 +38,11 @@ enum MarkdownRenderer {
             pre code { padding: 0; background: transparent; }
             hr { margin: 2.4em 0; border: 0; border-top: 1px solid light-dark(#ddd, #3a3a3a); }
             img { max-width: 100%; height: auto; border-radius: 6px; }
+            table { margin: 1.35em 0; border-collapse: collapse; width: 100%; font-size: .95em; }
+            th, td { padding: .5em .8em; border: 1px solid light-dark(#e2e2e2, #383838); text-align: left; }
+            th { background: light-dark(#f5f5f5, #222); font-weight: 600; }
+            tr:nth-child(even) td { background: light-dark(#fafafa, #1d1d1d); }
+            del { color: light-dark(#999, #777); }
             .task { list-style: none; margin-left: -1.4em; }
             .task::before { display: inline-block; width: 1.4em; content: "☐"; color: light-dark(#777, #aaa); }
             .task.done::before { content: "☑"; color: #2aa66b; }
@@ -72,7 +77,9 @@ enum MarkdownRenderer {
             listType = nil
         }
 
-        for line in lines {
+        var index = 0
+        while index < lines.count {
+            let line = lines[index]
             let trimmed = line.trimmingCharacters(in: .whitespaces)
 
             if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
@@ -83,11 +90,13 @@ enum MarkdownRenderer {
                     codeLines.removeAll(keepingCapacity: true)
                 }
                 inCodeFence.toggle()
+                index += 1
                 continue
             }
 
             if inCodeFence {
                 codeLines.append(line)
+                index += 1
                 continue
             }
 
@@ -97,12 +106,14 @@ enum MarkdownRenderer {
                 let anchor = headingIndex < headings.count ? headings[headingIndex].anchor : "heading-\(headingIndex)"
                 output.append("<h\(heading.level) id=\"\(anchor)\">\(inline(heading.title))</h\(heading.level)>")
                 headingIndex += 1
+                index += 1
                 continue
             }
 
             if trimmed.isEmpty {
                 flushParagraph()
                 closeList()
+                index += 1
                 continue
             }
 
@@ -110,14 +121,59 @@ enum MarkdownRenderer {
                 flushParagraph()
                 closeList()
                 output.append("<hr>")
+                index += 1
                 continue
             }
 
+            // 表格块：当前行是 | 行且下一行是分隔行。
+            if trimmed.hasPrefix("|"),
+               index + 1 < lines.count,
+               isTableSeparator(lines[index + 1]) {
+                flushParagraph()
+                closeList()
+                let alignments = tableAlignments(lines[index + 1])
+                var html = "<table>\n<thead>\n<tr>"
+                for (column, cell) in tableCells(trimmed).enumerated() {
+                    html += "<th\(alignmentAttribute(alignments, column))>\(inline(cell))</th>"
+                }
+                html += "</tr>\n</thead>\n<tbody>\n"
+                index += 2
+                while index < lines.count {
+                    let rowTrimmed = lines[index].trimmingCharacters(in: .whitespaces)
+                    guard rowTrimmed.hasPrefix("|") else { break }
+                    html += "<tr>"
+                    for (column, cell) in tableCells(rowTrimmed).enumerated() {
+                        html += "<td\(alignmentAttribute(alignments, column))>\(inline(cell))</td>"
+                    }
+                    html += "</tr>\n"
+                    index += 1
+                }
+                html += "</tbody>\n</table>"
+                output.append(html)
+                continue
+            }
+
+            // 引用块：合并连续的 > 行。
             if trimmed.hasPrefix(">") {
                 flushParagraph()
                 closeList()
-                let content = trimmed.dropFirst().trimmingCharacters(in: .whitespaces)
-                output.append("<blockquote>\(inline(content))</blockquote>")
+                var quoteParagraphs: [[String]] = [[]]
+                while index < lines.count {
+                    let quoteTrimmed = lines[index].trimmingCharacters(in: .whitespaces)
+                    guard quoteTrimmed.hasPrefix(">") else { break }
+                    let content = quoteTrimmed.dropFirst().trimmingCharacters(in: .whitespaces)
+                    if content.isEmpty {
+                        if !(quoteParagraphs.last?.isEmpty ?? true) { quoteParagraphs.append([]) }
+                    } else {
+                        quoteParagraphs[quoteParagraphs.count - 1].append(inline(content))
+                    }
+                    index += 1
+                }
+                let quoteHTML = quoteParagraphs
+                    .filter { !$0.isEmpty }
+                    .map { "<p>\($0.joined(separator: "<br>\n"))</p>" }
+                    .joined(separator: "\n")
+                output.append("<blockquote>\(quoteHTML)</blockquote>")
                 continue
             }
 
@@ -129,6 +185,7 @@ enum MarkdownRenderer {
                     listType = "ul"
                 }
                 output.append(renderListItem(item))
+                index += 1
                 continue
             }
 
@@ -140,11 +197,13 @@ enum MarkdownRenderer {
                     listType = "ol"
                 }
                 output.append("<li>\(inline(item))</li>")
+                index += 1
                 continue
             }
 
             closeList()
             paragraph.append(trimmed)
+            index += 1
         }
 
         flushParagraph()
@@ -155,8 +214,36 @@ enum MarkdownRenderer {
         return output.joined(separator: "\n")
     }
 
-    private static func parseHeading(_ line: String) -> (level: Int, title: String)? {
-        let count = line.prefix { $0 == "#" }.count
+    static func isTableSeparator(_ line: String) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard trimmed.hasPrefix("|"), trimmed.contains("-") else { return false }
+        return trimmed.allSatisfy { "|-: \t".contains($0) }
+    }
+
+    private static func tableCells(_ row: String) -> [String] {
+        var cells = row.components(separatedBy: "|")
+        if let first = cells.first, first.trimmingCharacters(in: .whitespaces).isEmpty { cells.removeFirst() }
+        if let last = cells.last, last.trimmingCharacters(in: .whitespaces).isEmpty { cells.removeLast() }
+        return cells.map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    private static func tableAlignments(_ separator: String) -> [String?] {
+        tableCells(separator.trimmingCharacters(in: .whitespaces)).map { cell in
+            let leading = cell.hasPrefix(":")
+            let trailing = cell.hasSuffix(":")
+            if leading && trailing { return "center" }
+            if trailing { return "right" }
+            if leading { return "left" }
+            return nil
+        }
+    }
+
+    private static func alignmentAttribute(_ alignments: [String?], _ column: Int) -> String {
+        guard column < alignments.count, let alignment = alignments[column] else { return "" }
+        return " style=\"text-align: \(alignment)\""
+    }
+
+    private static func parseHeading(_ line: String) -> (level: Int, title: String)? {        let count = line.prefix { $0 == "#" }.count
         guard (1...6).contains(count) else { return nil }
         let index = line.index(line.startIndex, offsetBy: count)
         guard index < line.endIndex, line[index].isWhitespace else { return nil }
@@ -213,6 +300,12 @@ enum MarkdownRenderer {
         }
         text = replace(text, pattern: #"__([^_]+)__"#) { captures in
             "<strong>\(captures[1])</strong>"
+        }
+        text = replace(text, pattern: #"~~([^~]+)~~"#) { captures in
+            "<del>\(captures[1])</del>"
+        }
+        text = replace(text, pattern: #"&lt;(https?://[^\s&]+)&gt;"#) { captures in
+            "<a href=\"\(captures[1])\">\(captures[1])</a>"
         }
         text = replace(text, pattern: #"(?<!\*)\*([^*]+)\*(?!\*)"#) { captures in
             "<em>\(captures[1])</em>"
