@@ -34,6 +34,54 @@ private final class EditorScrollEdgeEffectView: NSVisualEffectView {
 }
 
 final class MarkdownTextView: NSTextView {
+    /// 相对链接的解析基准（当前文档所在目录）。
+    var linkBaseURL: URL?
+
+    override func mouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+        let index = characterIndexForInsertion(at: point)
+        let text = string as NSString
+
+        if event.modifierFlags.contains(.command),
+           let target = MarkdownInteractions.linkTarget(in: text, at: index),
+           openLink(target) {
+            return
+        }
+
+        if !event.modifierFlags.contains(.command),
+           event.clickCount == 1,
+           let stateRange = MarkdownInteractions.checkboxStateRange(in: text, at: index) {
+            toggleCheckboxState(at: stateRange)
+            return
+        }
+
+        super.mouseDown(with: event)
+    }
+
+    private func toggleCheckboxState(at stateRange: NSRange) {
+        let current = (string as NSString).substring(with: stateRange)
+        let replacement = current == " " ? "x" : " "
+        guard shouldChangeText(in: stateRange, replacementString: replacement), let textStorage else { return }
+        textStorage.replaceCharacters(in: stateRange, with: replacement)
+        didChangeText()
+    }
+
+    private func openLink(_ target: String) -> Bool {
+        switch MarkdownInteractions.classifyLink(target, baseURL: linkBaseURL) {
+        case .external(let url):
+            NSWorkspace.shared.open(url)
+            return true
+        case .relativeFile(let path):
+            guard let base = linkBaseURL else { return false }
+            let resolved = URL(fileURLWithPath: path, relativeTo: base).standardizedFileURL
+            guard FileManager.default.fileExists(atPath: resolved.path) else { return false }
+            NSWorkspace.shared.open(resolved)
+            return true
+        case .anchor, .none:
+            return false
+        }
+    }
+
     @objc func toggleMarkdownBold(_ sender: Any?) {
         toggleWrapping(prefix: "**", suffix: "**")
     }

@@ -120,6 +120,8 @@ final class DocumentContentViewController: NSViewController, NSSplitViewDelegate
         self.headings = headings
         self.baseURL = baseURL
         activeAnchor = anchor
+        editorViewController.textView.linkBaseURL = baseURL
+        previewEditorViewController.textView.linkBaseURL = baseURL
         switch mode {
         case .editor:
             break
