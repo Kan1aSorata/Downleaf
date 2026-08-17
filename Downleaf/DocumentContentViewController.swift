@@ -88,7 +88,20 @@ final class DocumentContentViewController: NSViewController, NSSplitViewDelegate
         view = root
         addChild(editorViewController)
         installStableLayout()
+        wireScrollSync()
         applyModeVisibility()
+    }
+
+    /// 分屏两侧按可见区顶部的源码偏移互相对齐。
+    private func wireScrollSync() {
+        editorViewController.onScroll = { [weak self] offset in
+            guard let self, self.mode == .split, self.isPreviewEditorInstalled else { return }
+            self.previewEditorViewController.alignTop(toCharacterOffset: offset)
+        }
+        previewEditorViewController.onScroll = { [weak self] offset in
+            guard let self, self.mode == .split else { return }
+            self.editorViewController.alignTop(toCharacterOffset: offset)
+        }
     }
 
     override func viewDidLayout() {

@@ -52,4 +52,22 @@ final class EditorLivePreviewTests: XCTestCase {
         let font = try XCTUnwrap(storage.attribute(.font, at: location, effectiveRange: nil) as? NSFont)
         XCTAssertTrue(NSFontManager.shared.traits(of: font).contains(.boldFontMask))
     }
+
+    func testAlignTopScrollsCounterpartOffsetToVisibleTop() {
+        let longText = (1...300).map { "第 \($0) 行内容" }.joined(separator: "\n")
+        let editor = makeEditor(longText)
+        editor.view.frame = NSRect(x: 0, y: 0, width: 600, height: 400)
+        editor.view.layoutSubtreeIfNeeded()
+
+        let targetOffset = (longText as NSString).range(of: "第 150 行内容").location
+        editor.alignTop(toCharacterOffset: targetOffset)
+
+        let topOffset = editor.topVisibleCharacterOffset()
+        let text = longText as NSString
+        let topLine = text.substring(with: text.lineRange(for: NSRange(location: min(topOffset, text.length - 1), length: 0)))
+        XCTAssertTrue(
+            topLine.contains("第 149 行") || topLine.contains("第 150 行") || topLine.contains("第 151 行"),
+            "顶部行应接近第 150 行，实际是：\(topLine)"
+        )
+    }
 }

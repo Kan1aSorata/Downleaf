@@ -165,6 +165,10 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
 
     var onTextChange: ((String) -> Void)?
     var onCaretOffsetChange: ((Int) -> Void)?
+    /// 用户滚动时上报可见区顶部的源码偏移，用于分屏两侧同步。
+    var onScroll: ((Int) -> Void)?
+    private var isApplyingProgrammaticScroll = false
+    nonisolated(unsafe) private var scrollObserver: NSObjectProtocol?
 
     /// 覆盖全局实时预览偏好：分屏模式下左侧强制源码（false）、右侧强制实时预览（true）。
     var forcedLivePreview: Bool? {
@@ -193,6 +197,9 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     deinit {
         highlightTask?.cancel()
         preferencesTask?.cancel()
+        if let scrollObserver {
+            NotificationCenter.default.removeObserver(scrollObserver)
+        }
     }
 
     override func loadView() {
@@ -249,6 +256,17 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             for await _ in NotificationCenter.default.notifications(named: UserDefaults.didChangeNotification) {
                 guard !Task.isCancelled, let self else { return }
                 self.applySyntaxHighlighting()
+            }
+        }
+
+        scrollObserver = NotificationCenter.default.addObserver(
+            forName: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, !self.isApplyingProgrammaticScroll else { return }
+                self.onScroll?(self.topVisibleCharacterOffset())
             }
         }
     }
@@ -329,6 +347,46 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         let length = (textView.string as NSString).length
         let location = min(max(0, range.location), length)
         textView.scrollRangeToVisible(NSRange(location: location, length: min(1, max(0, length - location))))
+    }
+
+    // MARK: - 分屏同步滚动
+
+    /// 当前可见区顶部对应的源码偏移。
+    func topVisibleCharacterOffset() -> Int {
+        let visible = textView.visibleRect
+        let point = NSPoint(x: textView.textContainerInset.width + 1, y: visible.minY + 1)
+        return textView.characterIndexForInsertion(at: point)
+    }
+
+    /// 把指定源码偏移滚动到可见区顶部（TextKit 2 路径，不触碰旧 layoutManager）。
+    func alignTop(toCharacterOffset offset: Int) {
+        guard isViewLoaded,
+              let layoutManager = textView.textLayoutManager,
+              let contentManager = layoutManager.textContentManager else { return }
+        let length = (textView.string as NSString).length
+        let clamped = min(max(0, offset), length)
+        guard let location = contentManager.location(
+            contentManager.documentRange.location,
+            offsetBy: clamped
+        ) else { return }
+
+        layoutManager.ensureLayout(for: NSTextRange(location: location))
+        var fragmentY: CGFloat?
+        layoutManager.enumerateTextSegments(
+            in: NSTextRange(location: location),
+            type: .standard,
+            options: .rangeNotRequired
+        ) { _, rect, _, _ in
+            fragmentY = rect.minY
+            return false
+        }
+        guard let fragmentY else { return }
+
+        let targetY = max(0, fragmentY + textView.textContainerInset.height - 8)
+        isApplyingProgrammaticScroll = true
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        isApplyingProgrammaticScroll = false
     }
 
     func textDidChange(_ notification: Notification) {
