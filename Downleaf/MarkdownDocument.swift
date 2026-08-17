@@ -8,6 +8,22 @@ private struct MarkdownContentState: Sendable {
     static let empty = MarkdownContentState(text: "", fileFormat: .standard)
 }
 
+/// 外部（Git、终端、其他编辑器）改动磁盘文件后的处理决策。
+enum ExternalChangeResolution: Equatable {
+    /// 磁盘内容与内存一致（多半是自己的保存落盘），或已就同一磁盘版本问过用户。
+    case ignore
+    /// 本地无未保存修改，直接安静重载。
+    case autoReload
+    /// 本地有未保存修改且磁盘内容不同：必须让用户选择，绝不静默覆盖。
+    case askUser
+
+    static func decide(diskText: String, memoryText: String, isEdited: Bool, resolvedConflictText: String?) -> Self {
+        guard diskText != memoryText else { return .ignore }
+        guard isEdited else { return .autoReload }
+        return diskText == resolvedConflictText ? .ignore : .askUser
+    }
+}
+
 @objc(MarkdownDocument)
 final class MarkdownDocument: NSDocument {
     override class var autosavesInPlace: Bool { false }
@@ -20,6 +36,10 @@ final class MarkdownDocument: NSDocument {
     private var namedAutoSaveTask: Task<Void, Never>?
     private var recoverySaveTask: Task<Void, Never>?
     private var preferencesTask: Task<Void, Never>?
+    private var externalChangeTask: Task<Void, Never>?
+    private var isPresentingExternalChangeAlert = false
+    /// 用户在冲突弹窗中选择“保留我的修改”时对应的磁盘内容；同一磁盘版本不再重复打扰。
+    private var resolvedConflictDiskText: String?
     private var draftIdentifier = UUID()
     weak var primaryWindowController: DocumentWindowController?
 
@@ -46,6 +66,85 @@ final class MarkdownDocument: NSDocument {
         namedAutoSaveTask?.cancel()
         recoverySaveTask?.cancel()
         preferencesTask?.cancel()
+        externalChangeTask?.cancel()
+    }
+
+    // MARK: - 外部变更监测
+
+    nonisolated override func presentedItemDidChange() {
+        Task { @MainActor [weak self] in
+            self?.scheduleExternalChangeCheck()
+        }
+    }
+
+    private func scheduleExternalChangeCheck() {
+        externalChangeTask?.cancel()
+        externalChangeTask = Task { @MainActor [weak self] in
+            // 合并 git checkout 等短时间内的连续文件事件。
+            try? await Task.sleep(for: .milliseconds(300))
+            guard let self, !Task.isCancelled else { return }
+            self.handleExternalChange()
+        }
+    }
+
+    private func handleExternalChange() {
+        guard let url = fileURL,
+              !isPresentingExternalChangeAlert,
+              let data = try? Data(contentsOf: url),
+              let decoded = try? MarkdownCodec.decode(data) else {
+            return
+        }
+
+        switch ExternalChangeResolution.decide(
+            diskText: decoded.text,
+            memoryText: text,
+            isEdited: isDocumentEdited,
+            resolvedConflictText: resolvedConflictDiskText
+        ) {
+        case .ignore:
+            break
+        case .autoReload:
+            reloadFromDisk(url: url)
+        case .askUser:
+            presentExternalChangeConflict(url: url, diskText: decoded.text)
+        }
+    }
+
+    private func reloadFromDisk(url: URL) {
+        do {
+            try revert(toContentsOf: url, ofType: fileType ?? "net.daringfireball.markdown")
+            resolvedConflictDiskText = nil
+            primaryWindowController?.refreshDocumentIdentity()
+        } catch {
+            presentError(error)
+        }
+    }
+
+    private func presentExternalChangeConflict(url: URL, diskText: String) {
+        isPresentingExternalChangeAlert = true
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "“\(displayName ?? "文稿")”在磁盘上已被修改"
+        alert.informativeText = "另一个应用修改了这个文件，而你在 Downleaf 中还有未保存的修改。请选择保留哪个版本。"
+        alert.addButton(withTitle: "保留我的修改")
+        alert.addButton(withTitle: "载入磁盘版本")
+
+        let handleResponse: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+            guard let self else { return }
+            self.isPresentingExternalChangeAlert = false
+            if response == .alertSecondButtonReturn {
+                self.reloadFromDisk(url: url)
+            } else {
+                // 保留内存版本：记录磁盘内容避免重复弹窗；下一次保存会覆盖磁盘（用户已确认）。
+                self.resolvedConflictDiskText = diskText
+            }
+        }
+
+        if let parentWindow = primaryWindowController?.window {
+            alert.beginSheetModal(for: parentWindow, completionHandler: handleResponse)
+        } else {
+            handleResponse(alert.runModal())
+        }
     }
 
     override func makeWindowControllers() {
@@ -128,6 +227,7 @@ final class MarkdownDocument: NSDocument {
             if error == nil, let self {
                 self.recoverySaveTask?.cancel()
                 RecoveryStore.remove(identifier: self.draftIdentifier)
+                self.resolvedConflictDiskText = nil
             }
             self?.primaryWindowController?.refreshDocumentIdentity()
             completionHandler(error)
