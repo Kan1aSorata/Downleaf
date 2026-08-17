@@ -190,6 +190,12 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
     private var concealmentIsStale = false
     private static let hiddenMarkerFont = NSFont.systemFont(ofSize: 0.1)
 
+    /// 大文件安全模式阈值（UTF-16 长度）；测试可注入更小的值。
+    static var safeModeCharacterLimit = 2_000_000
+    private(set) var isSafeModeActive = false
+    private var safeModeOverridden = false
+    private var safeModeBanner: NSView?
+
     var caretOffset: Int {
         min(textView.selectedRange().location, (textView.string as NSString).length)
     }
@@ -416,12 +422,14 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
         guard isViewLoaded, !textView.hasMarkedText(), let storage = textView.textStorage else { return }
         let source = storage.string
         let fullRange = NSRange(location: 0, length: (source as NSString).length)
-        guard fullRange.length <= 2_000_000 else {
+        guard fullRange.length <= Self.safeModeCharacterLimit || safeModeOverridden else {
             concealableElements = []
             markerStates = []
             storage.setAttributes(baseAttributes(), range: fullRange)
+            setSafeModeActive(true)
             return
         }
+        setSafeModeActive(false)
 
         isHighlighting = true
         storage.beginEditing()
@@ -566,6 +574,55 @@ final class EditorViewController: NSViewController, NSTextViewDelegate {
             let font = value as? NSFont ?? NSFont.systemFont(ofSize: AppPreferences.editorFontSize)
             storage.addAttribute(.font, value: NSFontManager.shared.convert(font, toHaveTrait: traits), range: subrange)
         }
+    }
+
+    // MARK: - 大文件安全模式
+
+    private func setSafeModeActive(_ active: Bool) {
+        guard active != isSafeModeActive else { return }
+        isSafeModeActive = active
+        if active {
+            showSafeModeBanner()
+        } else {
+            safeModeBanner?.removeFromSuperview()
+            safeModeBanner = nil
+        }
+    }
+
+    private func showSafeModeBanner() {
+        guard safeModeBanner == nil, isViewLoaded else { return }
+        let banner = NSVisualEffectView()
+        banner.material = .headerView
+        banner.blendingMode = .withinWindow
+        banner.frame = NSRect(x: 0, y: max(0, view.bounds.height - 30), width: view.bounds.width, height: 30)
+        banner.autoresizingMask = [.width, .minYMargin]
+
+        let label = NSTextField(labelWithString: "大文件安全模式：已暂停实时预览样式，仅保留编辑与保存")
+        label.font = .systemFont(ofSize: 11)
+        label.textColor = .secondaryLabelColor
+
+        let button = NSButton(title: "仍要渲染", target: self, action: #selector(overrideSafeMode))
+        button.bezelStyle = .accessoryBarAction
+        button.controlSize = .small
+        button.font = .systemFont(ofSize: 11)
+
+        let stack = NSStackView(views: [label, button])
+        stack.orientation = .horizontal
+        stack.spacing = 10
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        banner.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.centerXAnchor.constraint(equalTo: banner.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: banner.centerYAnchor)
+        ])
+
+        view.addSubview(banner)
+        safeModeBanner = banner
+    }
+
+    @objc private func overrideSafeMode() {
+        safeModeOverridden = true
+        applySyntaxHighlighting()
     }
 
     private func baseAttributes() -> [NSAttributedString.Key: Any] {

@@ -243,7 +243,11 @@ final class DocumentRootSplitViewController: NSSplitViewController {
         semanticTask?.cancel()
         semanticTask = Task { [weak self] in
             if !immediate {
-                try? await Task.sleep(for: .milliseconds(130))
+                // 大文件安全模式：降低语义解析频率，避免每次输入都全文扫描。
+                let debounce: Duration = source.utf16.count > EditorViewController.safeModeCharacterLimit
+                    ? .seconds(1)
+                    : .milliseconds(130)
+                try? await Task.sleep(for: debounce)
             }
             guard !Task.isCancelled else { return }
             let headings = await Task.detached(priority: .userInitiated) {

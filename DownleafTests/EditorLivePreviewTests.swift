@@ -70,4 +70,27 @@ final class EditorLivePreviewTests: XCTestCase {
             "顶部行应接近第 150 行，实际是：\(topLine)"
         )
     }
+
+    func testSafeModeActivatesAboveThresholdAndCanBeOverridden() throws {
+        let originalLimit = EditorViewController.safeModeCharacterLimit
+        EditorViewController.safeModeCharacterLimit = 100
+        defer { EditorViewController.safeModeCharacterLimit = originalLimit }
+
+        let longText = "# 标题\n\n" + String(repeating: "内容行 **加粗**\n", count: 30)
+        let editor = makeEditor(longText)
+        editor.view.frame = NSRect(x: 0, y: 0, width: 600, height: 400)
+        editor.setInitialText(longText)
+
+        XCTAssertTrue(editor.isSafeModeActive)
+        let storage = try XCTUnwrap(editor.textView.textStorage)
+        let titleOffset = 2 // "# " 之后的标题文本
+        let headingFont = try XCTUnwrap(storage.attribute(.font, at: titleOffset, effectiveRange: nil) as? NSFont)
+        XCTAssertEqual(headingFont.pointSize, AppPreferences.editorFontSize, "安全模式下标题不应放大")
+
+        EditorViewController.safeModeCharacterLimit = 1_000_000
+        editor.setInitialText(longText)
+        XCTAssertFalse(editor.isSafeModeActive)
+        let styledFont = try XCTUnwrap(storage.attribute(.font, at: titleOffset, effectiveRange: nil) as? NSFont)
+        XCTAssertGreaterThan(styledFont.pointSize, AppPreferences.editorFontSize, "退出安全模式后标题恢复放大")
+    }
 }
